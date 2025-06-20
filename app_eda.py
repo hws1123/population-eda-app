@@ -5,6 +5,7 @@ import io
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import seaborn as sns
 
 # ---------------------
@@ -191,252 +192,230 @@ class EDA:
         st.title("📊 Bike Sharing Demand EDA")
         uploaded = st.file_uploader("population_trends.csv", type="csv")
         if not uploaded:
-            st.info("train.csv 파일을 업로드 해주세요.")
+            st.info("population_trends.csv 파일을 업로드 해주세요.")
             return
 
-        df = pd.read_csv(uploaded, parse_dates=['datetime'])
+        df = pd.read_csv(uploaded)
+        tabs = st.tabs(["기초 통계", "연도별 추이", "지역별 분석", "변화량 분석", "시각화"])
 
          # Tab 1: 기초 통계
         with tabs[0]:
             st.header("기초 통계")
-            uploaded_file = st.file_uploader("population_trends.csv 파일을 업로드하세요", type="csv")
+            # 2. 데이터 읽기
+            df = pd.read_csv(uploaded)
 
-            if uploaded_file:
-                # 2. 데이터 읽기
-                df = pd.read_csv(uploaded_file)
+            # 3. 결측치 '-' 처리 및 숫자 변환
+            df.replace('-', np.nan, inplace=True)
 
-                # 3. 결측치 '-' 처리 및 숫자 변환
-                df.replace('-', np.nan, inplace=True)
+            numeric_cols = ['인구', '출생아수(명)', '사망자수(명)']
+            df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
 
-                numeric_cols = ['인구', '출생아수(명)', '사망자수(명)']
-                df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
+            # 4. '세종' 지역의 결측치를 0으로 치환
+            df.loc[df['지역'] == '세종', numeric_cols] = df.loc[df['지역'] == '세종', numeric_cols].fillna(0)
 
-                # 4. '세종' 지역의 결측치를 0으로 치환
-                df.loc[df['지역'] == '세종', numeric_cols] = df.loc[df['지역'] == '세종', numeric_cols].fillna(0)
+            # 5. 데이터프레임 구조 출력 (df.info())
+            st.subheader("📋 데이터프레임 구조 (df.info())")
+            buffer = io.StringIO()
+            df.info(buf=buffer)
+            st.text(buffer.getvalue())
 
-                # 5. 데이터프레임 구조 출력 (df.info())
-                st.subheader("📋 데이터프레임 구조 (df.info())")
-                buffer = io.StringIO()
-                df.info(buf=buffer)
-                st.text(buffer.getvalue())
+            # 6. 요약 통계 출력 (df.describe())
+            st.subheader("📈 수치형 데이터 요약 통계 (df.describe())")
+            st.dataframe(df[numeric_cols].describe())
 
-                # 6. 요약 통계 출력 (df.describe())
-                st.subheader("📈 수치형 데이터 요약 통계 (df.describe())")
-                st.dataframe(df[numeric_cols].describe())
-            else:
-                st.info("먼저 population_trends.csv 파일을 업로드해주세요.")
+    # Tab 2: 연도별 전체 인구 추이 및 예측
+    with tabs[1]:
+        st.header("연도별 추이")
+        # 2. 데이터 로드 및 기본 전처리
+        df = pd.read_csv(uploaded)
+        df.replace('-', pd.NA, inplace=True)
+        df[['인구', '출생아수(명)', '사망자수(명)']] = df[['인구', '출생아수(명)', '사망자수(명)']].apply(pd.to_numeric, errors='coerce')
 
-        # Tab 2: 연도별 전체 인구 추이 및 예측
-        with tabs[1]:
-            st.header("연도별 추이")
-            uploaded_file = st.file_uploader("population_trends.csv", type="csv")
+        # 3. 전국 데이터 필터링
+        df_national = df[df['지역'] == '전국'].dropna(subset=['인구'])
 
-            if uploaded_file:
-                # 2. 데이터 로드 및 기본 전처리
-                df = pd.read_csv(uploaded_file)
-                df.replace('-', pd.NA, inplace=True)
-                df[['인구', '출생아수(명)', '사망자수(명)']] = df[['인구', '출생아수(명)', '사망자수(명)']].apply(pd.to_numeric, errors='coerce')
+        # 4. 최근 3년 평균 증감 계산
+        df_national_sorted = df_national.sort_values('연도')
+        recent = df_national_sorted.tail(3)
+        avg_change = (recent['출생아수(명)'] - recent['사망자수(명)']).mean()
 
-                # 3. 전국 데이터 필터링
-                df_national = df[df['지역'] == '전국'].dropna(subset=['인구'])
+        # 5. 마지막 연도와 인구
+        last_year = recent['연도'].max()
+        last_population = recent[recent['연도'] == last_year]['인구'].values[0]
 
-                # 4. 최근 3년 평균 증감 계산
-                df_national_sorted = df_national.sort_values('연도')
-                recent = df_national_sorted.tail(3)
-                avg_change = (recent['출생아수(명)'] - recent['사망자수(명)']).mean()
+        # 6. 2035년 인구 예측
+        future_year = 2035
+        years_forward = future_year - last_year
+        predicted_population = last_population + avg_change * years_forward
 
-                # 5. 마지막 연도와 인구
-                last_year = recent['연도'].max()
-                last_population = recent[recent['연도'] == last_year]['인구'].values[0]
+        # 7. 시각화
+        fig, ax = plt.subplots(figsize=(10, 5))
+        sns.lineplot(data=df_national_sorted, x='연도', y='인구', marker='o', ax=ax)
+        ax.axvline(future_year, linestyle='--', color='gray')
+        ax.scatter(future_year, predicted_population, color='red', label='2035 Prediction')
+        ax.text(future_year, predicted_population, f"{int(predicted_population):,}", color='red', va='bottom')
 
-                # 6. 2035년 인구 예측
-                future_year = 2035
-                years_forward = future_year - last_year
-                predicted_population = last_population + avg_change * years_forward
+        ax.set_title("National Population Trend")
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Population")
+        ax.legend()
 
-                # 7. 시각화
-                fig, ax = plt.subplots(figsize=(10, 5))
-                sns.lineplot(data=df_national_sorted, x='연도', y='인구', marker='o', ax=ax)
-                ax.axvline(future_year, linestyle='--', color='gray')
-                ax.scatter(future_year, predicted_population, color='red', label='2035 Prediction')
-                ax.text(future_year, predicted_population, f"{int(predicted_population):,}", color='red', va='bottom')
+        st.pyplot(fig)
 
-                ax.set_title("National Population Trend")
-                ax.set_xlabel("Year")
-                ax.set_ylabel("Population")
-                ax.legend()
-
-                st.pyplot(fig)
-
-                st.markdown(f"""
-                **Prediction Summary**  
-                - Average annual net change (Births - Deaths): `{avg_change:,.0f}`  
-                - Predicted population in {future_year}: `{int(predicted_population):,}`
-                """)
-            else:
-                st.info("Please upload the `population_trends.csv` file.")
+        st.markdown(f"""
+        **Prediction Summary**  
+        - Average annual net change (Births - Deaths): `{avg_change:,.0f}`  
+        - Predicted population in {future_year}: `{int(predicted_population):,}`
+        """)
 
         # Tab 3: 지역별 인구 변화량
         with tabs[2]:
-            st.header("지역별분석")
-            uploaded = st.file_uploader("population_trends.csv", type="csv")
+            st.header("지역별 분석")
+            df = pd.read_csv(uploaded)
+            df.replace('-', pd.NA, inplace=True)
+            df[['인구']] = df[['인구']].apply(pd.to_numeric, errors='coerce')
+            df = df[df['지역'] != '전국'].dropna(subset=['인구'])
 
-            if uploaded:
-                df = pd.read_csv(uploaded)
-                df.replace('-', pd.NA, inplace=True)
-                df[['인구']] = df[['인구']].apply(pd.to_numeric, errors='coerce')
-                df = df[df['지역'] != '전국'].dropna(subset=['인구'])
+            # 📍 지역명 영문 변환 (예시 맵핑: 필요시 더 추가 가능)
+            region_map = {
+                '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu', '인천': 'Incheon',
+                '광주': 'Gwangju', '대전': 'Daejeon', '울산': 'Ulsan', '세종': 'Sejong',
+                '경기': 'Gyeonggi', '강원': 'Gangwon', '충북': 'Chungbuk', '충남': 'Chungnam',
+                '전북': 'Jeonbuk', '전남': 'Jeonnam', '경북': 'Gyeongbuk', '경남': 'Gyeongnam',
+                '제주': 'Jeju'
+            }
+            df['region_en'] = df['지역'].map(region_map)
 
-                # 📍 지역명 영문 변환 (예시 맵핑: 필요시 더 추가 가능)
-                region_map = {
-                    '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu', '인천': 'Incheon',
-                    '광주': 'Gwangju', '대전': 'Daejeon', '울산': 'Ulsan', '세종': 'Sejong',
-                    '경기': 'Gyeonggi', '강원': 'Gangwon', '충북': 'Chungbuk', '충남': 'Chungnam',
-                    '전북': 'Jeonbuk', '전남': 'Jeonnam', '경북': 'Gyeongbuk', '경남': 'Gyeongnam',
-                    '제주': 'Jeju'
-                }
-                df['region_en'] = df['지역'].map(region_map)
+            # 🧮 피벗 테이블
+            pivot = df.pivot(index='region_en', columns='연도', values='인구')
+            pivot = pivot.dropna()
 
-                # 🧮 피벗 테이블
-                pivot = df.pivot(index='region_en', columns='연도', values='인구')
-                pivot = pivot.dropna()
+            # 최근 5년 변화량 및 변화율 계산
+            recent_years = sorted(pivot.columns)[-5:]
+            change = pivot[recent_years[-1]] - pivot[recent_years[0]]
+            rate = (change / pivot[recent_years[0]]) * 100
 
-                # 최근 5년 변화량 및 변화율 계산
-                recent_years = sorted(pivot.columns)[-5:]
-                change = pivot[recent_years[-1]] - pivot[recent_years[0]]
-                rate = (change / pivot[recent_years[0]]) * 100
+            # 내림차순 정렬
+            change_sorted = change.sort_values(ascending=False)
+            rate_sorted = rate.loc[change_sorted.index]
 
-                # 내림차순 정렬
-                change_sorted = change.sort_values(ascending=False)
-                rate_sorted = rate.loc[change_sorted.index]
+            # 단위: 천 명
+            change_k = change_sorted / 1000
 
-                # 단위: 천 명
-                change_k = change_sorted / 1000
+            # 🎨 그래프 1: 변화량
+            fig1, ax1 = plt.subplots(figsize=(10, 8))
+            sns.barplot(x=change_k.values, y=change_k.index, ax=ax1, palette="Blues_d")
+            ax1.set_title("Population Change (Last 5 Years)")
+            ax1.set_xlabel("Change (thousands)")
+            ax1.set_ylabel("Region")
+            for i, val in enumerate(change_k.values):
+                ax1.text(val, i, f"{val:,.0f}", va='center')
+            st.pyplot(fig1)
 
-                # 🎨 그래프 1: 변화량
-                fig1, ax1 = plt.subplots(figsize=(10, 8))
-                sns.barplot(x=change_k.values, y=change_k.index, ax=ax1, palette="Blues_d")
-                ax1.set_title("Population Change (Last 5 Years)")
-                ax1.set_xlabel("Change (thousands)")
-                ax1.set_ylabel("Region")
-                for i, val in enumerate(change_k.values):
-                    ax1.text(val, i, f"{val:,.0f}", va='center')
-                st.pyplot(fig1)
+            # 🎨 그래프 2: 변화율
+            fig2, ax2 = plt.subplots(figsize=(10, 8))
+            sns.barplot(x=rate_sorted.values, y=rate_sorted.index, ax=ax2, palette="Greens_d")
+            ax2.set_title("Population Change Rate (%)")
+            ax2.set_xlabel("Change Rate (%)")
+            ax2.set_ylabel("Region")
+            for i, val in enumerate(rate_sorted.values):
+                ax2.text(val, i, f"{val:.1f}%", va='center')
+            st.pyplot(fig2)
 
-                # 🎨 그래프 2: 변화율
-                fig2, ax2 = plt.subplots(figsize=(10, 8))
-                sns.barplot(x=rate_sorted.values, y=rate_sorted.index, ax=ax2, palette="Greens_d")
-                ax2.set_title("Population Change Rate (%)")
-                ax2.set_xlabel("Change Rate (%)")
-                ax2.set_ylabel("Region")
-                for i, val in enumerate(rate_sorted.values):
-                    ax2.text(val, i, f"{val:.1f}%", va='center')
-                st.pyplot(fig2)
-
-                # 📘 해설
-                st.markdown("### Interpretation")
-                st.markdown(f"""
-                - The first chart shows the **absolute change** in population (in thousands) from {recent_years[0]} to {recent_years[-1]} for each region.
-                - The second chart shows the **relative change (%)**, allowing comparison regardless of initial population size.
-                - Regions like **Gyeonggi** may show large absolute increases due to size, while **Sejong** may stand out in percentage terms.
-                """)
-            else:
-                st.info("Please upload the `population_trends.csv` file.")
+            # 📘 해설
+            st.markdown("### Interpretation")
+            st.markdown(f"""
+            - The first chart shows the **absolute change** in population (in thousands) from {recent_years[0]} to {recent_years[-1]} for each region.
+            - The second chart shows the **relative change (%)**, allowing comparison regardless of initial population size.
+            - Regions like **Gyeonggi** may show large absolute increases due to size, while **Sejong** may stand out in percentage terms.
+            """)
 
         # Tab 4: 증감률 상위 100개
         with tabs[3]:
             st.header("변화량 분석")
-            uploaded = st.file_uploader("population_trends.csv", type="csv")
-            if uploaded_file:
-                df = pd.read_csv(uploaded_file)
-                df.replace('-', pd.NA, inplace=True)
-                df[['인구']] = df[['인구']].apply(pd.to_numeric, errors='coerce')
-                df = df[df['지역'] != '전국'].dropna(subset=['인구'])
+            df = pd.read_csv(uploaded)
+            df.replace('-', pd.NA, inplace=True)
+            df[['인구']] = df[['인구']].apply(pd.to_numeric, errors='coerce')
+            df = df[df['지역'] != '전국'].dropna(subset=['인구'])
 
-                # 📊 정렬 및 증감(diff) 계산
-                df = df.sort_values(['지역', '연도'])
-                df['증감'] = df.groupby('지역')['인구'].diff()
+            # 📊 정렬 및 증감(diff) 계산
+            df = df.sort_values(['지역', '연도'])
+            df['증감'] = df.groupby('지역')['인구'].diff()
 
-                # 🔍 상위 100개 추출
-                top100 = df.dropna(subset=['증감']).sort_values(by='증감', ascending=False).head(100)
+            # 🔍 상위 100개 추출
+            top100 = df.dropna(subset=['증감']).sort_values(by='증감', ascending=False).head(100)
 
-                # 💡 컬러 스타일 함수
-                def highlight_change(val):
-                    color = (
-                        f'background-color: rgba(0, 100, 255, 0.2)' if val > 0 else
-                        f'background-color: rgba(255, 50, 50, 0.2)'
-                    )
-                    return color
-
-                # 📋 테이블 출력 (컬러바 + 콤마 포맷)
-                st.dataframe(
-                    top100.style
-                    .applymap(highlight_change, subset=['증감'])
-                    .format({'인구': '{:,.0f}', '증감': '{:,.0f}'})
+            # 💡 컬러 스타일 함수
+            def highlight_change(val):
+                color = (
+                    f'background-color: rgba(0, 100, 255, 0.2)' if val > 0 else
+                    f'background-color: rgba(255, 50, 50, 0.2)'
                 )
+                return color
 
-                st.markdown(f"""
-                ### Interpretation
-                - This table shows the **top 100 increases** in population by region and year.
-                - **Blue background**: population increased from the previous year.  
-                - **Red background**: population decreased.
-                - All numbers are formatted with **thousands separators**.
-                """)
-            else:
-                st.info("Please upload the `population_trends.csv` file.")
+            # 📋 테이블 출력 (컬러바 + 콤마 포맷)
+            st.dataframe(
+                top100.style
+                .applymap(highlight_change, subset=['증감'])
+                .format({'인구': '{:,.0f}', '증감': '{:,.0f}'})
+            )
+
+            st.markdown(f"""
+            ### Interpretation
+            - This table shows the **top 100 increases** in population by region and year.
+            - **Blue background**: population increased from the previous year.  
+            - **Red background**: population decreased.
+            - All numbers are formatted with **thousands separators**.
+            """)
 
         # Tab 5: 지역-연도 피벗 히트맵
         with tabs[4]:
             st.header("시각화")
-            uploaded = st.file_uploader("population_trends.csv", type="csv")
-            if uploaded_file:
-                # 2. 데이터 로드 및 전처리
-                df = pd.read_csv(uploaded_file)
-                df.replace('-', pd.NA, inplace=True)
-                df = df[df['지역'] != '전국']  # '전국' 제외
-                df['인구'] = pd.to_numeric(df['인구'], errors='coerce')
-                df = df.dropna(subset=['인구'])
+            # 2. 데이터 로드 및 전처리
+            df = pd.read_csv(uploaded)
+            df.replace('-', pd.NA, inplace=True)
+            df = df[df['지역'] != '전국']  # '전국' 제외
+            df['인구'] = pd.to_numeric(df['인구'], errors='coerce')
+            df = df.dropna(subset=['인구'])
 
-                # 3. 지역명을 영문으로 매핑
-                region_map = {
-                    '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu', '인천': 'Incheon',
-                    '광주': 'Gwangju', '대전': 'Daejeon', '울산': 'Ulsan', '세종': 'Sejong',
-                    '경기': 'Gyeonggi', '강원': 'Gangwon', '충북': 'Chungbuk', '충남': 'Chungnam',
-                    '전북': 'Jeonbuk', '전남': 'Jeonnam', '경북': 'Gyeongbuk', '경남': 'Gyeongnam',
-                    '제주': 'Jeju'
-                }
-                df['region_en'] = df['지역'].map(region_map)
+            # 3. 지역명을 영문으로 매핑
+            region_map = {
+                '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu', '인천': 'Incheon',
+                '광주': 'Gwangju', '대전': 'Daejeon', '울산': 'Ulsan', '세종': 'Sejong',
+                '경기': 'Gyeonggi', '강원': 'Gangwon', '충북': 'Chungbuk', '충남': 'Chungnam',
+                '전북': 'Jeonbuk', '전남': 'Jeonnam', '경북': 'Gyeongbuk', '경남': 'Gyeongnam',
+                '제주': 'Jeju'
+            }
+            df['region_en'] = df['지역'].map(region_map)
 
-                # 4. 피벗 테이블 생성 (지역: 행, 연도: 열)
-                pivot_df = df.pivot(index='region_en', columns='연도', values='인구').fillna(0)
-                pivot_df = pivot_df.sort_index()
+            # 4. 피벗 테이블 생성 (지역: 행, 연도: 열)
+            pivot_df = df.pivot(index='region_en', columns='연도', values='인구').fillna(0)
+            pivot_df = pivot_df.sort_index()
 
-                # 5. 누적 영역 그래프
-                years = pivot_df.columns.tolist()
-                regions = pivot_df.index.tolist()
-                data = pivot_df.values
+            # 5. 누적 영역 그래프
+            years = pivot_df.columns.tolist()
+            regions = pivot_df.index.tolist()
+            data = pivot_df.values
 
-                fig, ax = plt.subplots(figsize=(12, 6))
+            fig, ax = plt.subplots(figsize=(12, 6))
 
-                # 색상 구분 (tab10 등 컬러맵)
-                colors = cm.get_cmap('tab20', len(regions)).colors
+            # 색상 구분 (tab10 등 컬러맵)
+            colors = cm.get_cmap('tab20', len(regions)).colors
 
-                ax.stackplot(years, data, labels=regions, colors=colors, alpha=0.9)
+            ax.stackplot(years, data, labels=regions, colors=colors, alpha=0.9)
 
-                ax.set_title("Population by Region Over Years")
-                ax.set_xlabel("Year")
-                ax.set_ylabel("Population")
-                ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-                ax.margins(x=0)
-                ax.set_xlim(min(years), max(years))
+            ax.set_title("Population by Region Over Years")
+            ax.set_xlabel("Year")
+            ax.set_ylabel("Population")
+            ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+            ax.margins(x=0)
+            ax.set_xlim(min(years), max(years))
 
-                st.pyplot(fig)
+            st.pyplot(fig)
 
-                # 피벗 테이블도 아래에 출력
-                st.subheader("📋 Pivot Table (Population by Region and Year)")
-                st.dataframe(pivot_df.style.format('{:,.0f}'))
-            else:
-                st.info("Please upload the `population_trends.csv` file.")
+            # 피벗 테이블도 아래에 출력
+            st.subheader("📋 Pivot Table (Population by Region and Year)")
+            st.dataframe(pivot_df.style.format('{:,.0f}'))
 
 
 # ---------------------
