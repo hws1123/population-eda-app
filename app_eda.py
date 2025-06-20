@@ -201,8 +201,6 @@ class EDA:
          # Tab 1: 기초 통계
         with tabs[0]:
             st.header("기초 통계")
-            # 2. 데이터 읽기
-            df = pd.read_csv(uploaded)
 
             # 3. 결측치 '-' 처리 및 숫자 변환
             df.replace('-', np.nan, inplace=True)
@@ -227,7 +225,6 @@ class EDA:
         with tabs[1]:
             st.header("연도별 추이")
             # 2. 데이터 로드 및 기본 전처리
-            df = pd.read_csv(uploaded)
             df.replace('-', pd.NA, inplace=True)
             df[['인구', '출생아수(명)', '사망자수(명)']] = df[['인구', '출생아수(명)', '사망자수(명)']].apply(pd.to_numeric, errors='coerce')
 
@@ -271,7 +268,6 @@ class EDA:
         # Tab 3: 지역별 인구 변화량
         with tabs[2]:
             st.header("지역별 분석")
-            df = pd.read_csv(uploaded)
             df.replace('-', pd.NA, inplace=True)
             df[['인구']] = df[['인구']].apply(pd.to_numeric, errors='coerce')
             df = df[df['지역'] != '전국'].dropna(subset=['인구'])
@@ -333,7 +329,6 @@ class EDA:
         # Tab 4: 증감률 상위 100개
         with tabs[3]:
             st.header("변화량 분석")
-            df = pd.read_csv(uploaded)
             df.replace('-', pd.NA, inplace=True)
             df[['인구']] = df[['인구']].apply(pd.to_numeric, errors='coerce')
             df = df[df['지역'] != '전국'].dropna(subset=['인구'])
@@ -372,7 +367,6 @@ class EDA:
         with tabs[4]:
             st.header("시각화")
             # 2. 데이터 로드 및 전처리
-            df = pd.read_csv(uploaded)
             df.replace('-', pd.NA, inplace=True)
             df = df[df['지역'] != '전국']  # '전국' 제외
             df['인구'] = pd.to_numeric(df['인구'], errors='coerce')
