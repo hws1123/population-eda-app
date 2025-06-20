@@ -339,30 +339,34 @@ class EDA:
         # Tab 4: 증감률 상위 100개
         with tabs[3]:
             st.header("변화량 분석")
-            df.replace('-', pd.NA, inplace=True)
+            df.replace('-', np.nan, inplace=True)
             df[['인구']] = df[['인구']].apply(pd.to_numeric, errors='coerce')
             df = df[df['지역'] != '전국'].dropna(subset=['인구'])
 
-            # 📊 정렬 및 증감(diff) 계산
+            # 증감 계산
             df = df.sort_values(['지역', '연도'])
             df['증감'] = df.groupby('지역')['인구'].diff()
 
-            # 🔍 상위 100개 추출
+            # 상위 100개 추출
             top100 = df.dropna(subset=['증감']).sort_values(by='증감', ascending=False).head(100)
 
-            # 💡 컬러 스타일 함수
+            # 숫자 열 전체 지정
+            numeric_cols = top100.select_dtypes(include='number').columns.tolist()
+
+            # 컬러 강조 함수
             def highlight_change(val):
                 color = (
-                    f'background-color: rgba(0, 100, 255, 0.2)' if val > 0 else
-                    f'background-color: rgba(255, 50, 50, 0.2)'
+                    'background-color: rgba(0, 100, 255, 0.15)' if val > 0 else
+                    'background-color: rgba(255, 80, 80, 0.15)'
                 )
                 return color
 
-            # 📋 테이블 출력 (컬러바 + 콤마 포맷)
+            # 강조 및 포맷 스타일
+            st.subheader("🔝 증감률 상위 100개 (지역-연도별)")
             st.dataframe(
                 top100.style
                 .applymap(highlight_change, subset=['증감'])
-                .format({'인구': '{:,.0f}', '증감': '{:,.0f}'})
+                .format({col: '{:,.0f}' for col in numeric_cols})  # 👈 모든 숫자 천단위 콤마 처리
             )
 
             st.markdown(f"""
