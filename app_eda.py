@@ -223,50 +223,50 @@ class EDA:
             st.subheader("📈 수치형 데이터 요약 통계 (df.describe())")
             st.dataframe(df[numeric_cols].describe())
 
-    # Tab 2: 연도별 전체 인구 추이 및 예측
-    with tabs[1]:
-        st.header("연도별 추이")
-        # 2. 데이터 로드 및 기본 전처리
-        df = pd.read_csv(uploaded)
-        df.replace('-', pd.NA, inplace=True)
-        df[['인구', '출생아수(명)', '사망자수(명)']] = df[['인구', '출생아수(명)', '사망자수(명)']].apply(pd.to_numeric, errors='coerce')
+        # Tab 2: 연도별 전체 인구 추이 및 예측
+        with tabs[1]:
+            st.header("연도별 추이")
+            # 2. 데이터 로드 및 기본 전처리
+            df = pd.read_csv(uploaded)
+            df.replace('-', pd.NA, inplace=True)
+            df[['인구', '출생아수(명)', '사망자수(명)']] = df[['인구', '출생아수(명)', '사망자수(명)']].apply(pd.to_numeric, errors='coerce')
 
-        # 3. 전국 데이터 필터링
-        df_national = df[df['지역'] == '전국'].dropna(subset=['인구'])
+            # 3. 전국 데이터 필터링
+            df_national = df[df['지역'] == '전국'].dropna(subset=['인구'])
 
-        # 4. 최근 3년 평균 증감 계산
-        df_national_sorted = df_national.sort_values('연도')
-        recent = df_national_sorted.tail(3)
-        avg_change = (recent['출생아수(명)'] - recent['사망자수(명)']).mean()
+            # 4. 최근 3년 평균 증감 계산
+            df_national_sorted = df_national.sort_values('연도')
+            recent = df_national_sorted.tail(3)
+            avg_change = (recent['출생아수(명)'] - recent['사망자수(명)']).mean()
 
-        # 5. 마지막 연도와 인구
-        last_year = recent['연도'].max()
-        last_population = recent[recent['연도'] == last_year]['인구'].values[0]
+            # 5. 마지막 연도와 인구
+            last_year = recent['연도'].max()
+            last_population = recent[recent['연도'] == last_year]['인구'].values[0]
 
-        # 6. 2035년 인구 예측
-        future_year = 2035
-        years_forward = future_year - last_year
-        predicted_population = last_population + avg_change * years_forward
+            # 6. 2035년 인구 예측
+            future_year = 2035
+            years_forward = future_year - last_year
+            predicted_population = last_population + avg_change * years_forward
 
-        # 7. 시각화
-        fig, ax = plt.subplots(figsize=(10, 5))
-        sns.lineplot(data=df_national_sorted, x='연도', y='인구', marker='o', ax=ax)
-        ax.axvline(future_year, linestyle='--', color='gray')
-        ax.scatter(future_year, predicted_population, color='red', label='2035 Prediction')
-        ax.text(future_year, predicted_population, f"{int(predicted_population):,}", color='red', va='bottom')
+            # 7. 시각화
+            fig, ax = plt.subplots(figsize=(10, 5))
+            sns.lineplot(data=df_national_sorted, x='연도', y='인구', marker='o', ax=ax)
+            ax.axvline(future_year, linestyle='--', color='gray')
+            ax.scatter(future_year, predicted_population, color='red', label='2035 Prediction')
+            ax.text(future_year, predicted_population, f"{int(predicted_population):,}", color='red', va='bottom')
 
-        ax.set_title("National Population Trend")
-        ax.set_xlabel("Year")
-        ax.set_ylabel("Population")
-        ax.legend()
+            ax.set_title("National Population Trend")
+            ax.set_xlabel("Year")
+            ax.set_ylabel("Population")
+            ax.legend()
 
-        st.pyplot(fig)
+            st.pyplot(fig)
 
-        st.markdown(f"""
-        **Prediction Summary**  
-        - Average annual net change (Births - Deaths): `{avg_change:,.0f}`  
-        - Predicted population in {future_year}: `{int(predicted_population):,}`
-        """)
+            st.markdown(f"""
+            **Prediction Summary**  
+            - Average annual net change (Births - Deaths): `{avg_change:,.0f}`  
+            - Predicted population in {future_year}: `{int(predicted_population):,}`
+            """)
 
         # Tab 3: 지역별 인구 변화량
         with tabs[2]:
